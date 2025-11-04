@@ -81,7 +81,7 @@ def chat():
 
 @app.route("/")
 def index():
-    return send_from_directory(PUBLIC_DIR, "index.html")
+    return "✅ Welcome! Flask backend is running successfully."
 
 if __name__ == "__main__":
     app.run(debug=True)
