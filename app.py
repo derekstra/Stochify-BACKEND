@@ -39,8 +39,6 @@ def call_gpt5(prompt):
     print("\n=== 🎨 GPT-5 RAW RESPONSE ===\n", raw, "\n============================\n")
     return raw
 
-
-# --- Chat Endpoint ---
 @app.route("/api/chat", methods=["POST"])
 def chat():
     user_input = request.json.get("message", "")
@@ -80,8 +78,8 @@ def chat():
     with open(gen_path, encoding="utf-8") as f:
         p2 = f.read()
 
-    # Stage 2: Code Generation (GPT-5)
-    final_code = call_gpt5(f"{p2}\n\nStructured Request:\n{dissected_raw}")
+    # 🧠 Stage 2: Code Generation (also using Groq temporarily)
+    final_code = call_groq(f"{p2}\n\nStructured Request:\n{dissected_raw}")
 
     # Clean code
     cleaned_code = (
@@ -103,7 +101,6 @@ def chat():
         "code": cleaned_code,
         "status": "complete"
     })
-
 
 @app.route("/")
 def index():
