@@ -40,12 +40,20 @@ def chat():
 
     dimension, cartesian, chat_response = "2d", False, "✅ Visualization ready."
     try:
-        parsed = json.loads(re.sub(r"^```json|```$", "", dissected_raw.strip()))
-        dimension = parsed.get("dimension", "2d").lower().strip()
-        cartesian = str(parsed.get("cartesian", "false")).lower() == "true"
-        chat_response = parsed.get("chat_response", chat_response)
+        # Try to extract JSON even if surrounded by text
+        json_match = re.search(r"\{[\s\S]*\}", dissected_raw)
+        if json_match:
+            parsed = json.loads(json_match.group(0))
+        else:
+            parsed = {}
     except Exception as e:
         print("⚠️ JSON parse error:", e)
+        parsed = {}  # only reset if parsing fails
+
+    # Safely extract keys
+    dimension = parsed.get("dimension", "2d").lower().strip()
+    cartesian = str(parsed.get("cartesian", "false")).lower() == "true"
+    chat_response = parsed.get("chat_response", "✅ Visualization ready.")
 
     if cartesian:
         gen_file = "3D_Cartesian.txt" if dimension == "3d" else "2D_Cartesian.txt"
