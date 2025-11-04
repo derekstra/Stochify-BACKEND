@@ -1,7 +1,9 @@
-from flask import Flask, request, jsonify, send_from_directory
-import os, requests, re, json
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import os, requests, json, re
 
 app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": ["https://stochify.com"]}})
 
 # === Paths ===
 BASE_DIR = os.path.dirname(__file__)
