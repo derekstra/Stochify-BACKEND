@@ -13,32 +13,44 @@ Return a single Three.js script in a <script> block with the following objective
 
 TECHNICAL/OUTPUT FORMAT:
 
-Use Three.js v0.128+ and render only inside a container with ID #viz.
 Output a complete <script type="module">...</script> block — no comments, markdown, or explanations.
 
-Always include:
+Environment:
+- Use Three.js v0.160.0 (ES module syntax)
+- Import from:
+  https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js
+  https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js
+- Render only inside container with ID #viz
+- Must include:
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(...);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+- Wrap the code between:
+  <script type="module">
+  // === STOCHIFY-THREE-ENGINEER OUTPUT ===
+  ...
+  // === END STOCHIFY-THREE-ENGINEER OUTPUT ===
+  </script>
 
-Use OrbitControls for navigation, ambient + directional lighting for realism, and a dark transparent background (0x111111).
-Frame the scene with a diagonal camera angle and make the renderer responsive to window resizing.
-Map JSON elements to appropriate geometries (SphereGeometry, BoxGeometry, Line, etc.) with MeshStandardMaterial or LineBasicMaterial.
+Scene setup:
+- Use OrbitControls for navigation
+- Add ambient + directional lighting for realism
+- Background: transparent
+- Camera: diagonal angle framing the scene
+- Renderer: responsive to window resizing
 
-Implement all features in interactivity:
-  -"animation": true → smooth loop via requestAnimationFrame().
-  -"sliders" → live parameter adjustment.
-  -"controls" → include "play", "pause", "reset" as specified.
+Geometry mapping:
+- Map JSON elements to Three.js geometries:
+  SphereGeometry, BoxGeometry, PlaneGeometry, Line, etc.
+- Use MeshStandardMaterial for meshes, LineBasicMaterial for lines
 
-Infer logical defaults when missing.
+Interactivity:
+- "animation": true → run smooth loop via requestAnimationFrame()
+- "sliders" → enable live parameter adjustment
+- "controls" → include "play", "pause", "reset" as specified
 
-End output exactly as:
-
-<script type="module">
-// === STOCHIFY-THREE-ENGINEER OUTPUT ===
-...
-// === END STOCHIFY-THREE-ENGINEER OUTPUT ===
-</script>
+Defaults:
+- Infer logical defaults for camera, lighting, material, and animation when unspecified
 
 RULES:
 
