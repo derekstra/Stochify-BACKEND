@@ -28,7 +28,6 @@ def call_openai(model, prompt):
     print(f"\n=== 🧠 {model.upper()} RAW RESPONSE ===\n{raw}\n============================\n")
     return raw
 
-
 @app.route("/api/chat", methods=["POST"])
 def chat():
     user_input = request.json.get("message", "")
@@ -37,23 +36,28 @@ def chat():
     # === Stage 1: Dissection (GPT-4-mini) ===
     with open(os.path.join(PUBLIC_DIR, "dissection.txt"), encoding="utf-8") as f:
         p1 = f.read()
+
     dissected_raw = call_openai(DISSECTOR_MODEL, f"{p1}\n\nUser request:\n{user_input}")
 
-    # Parse JSON safely
+    # ✅ NEW: Explicit debug print for dissector output
+    print("\n=== 🧩 RAW DISSECTOR RESPONSE (PRE-PARSE) ===")
+    print(dissected_raw)
+    print("=============================================\n")
+
+    # --- Safer JSON parsing (handles markdown and multiple blocks) ---
     dimension, description = "2d", "✅ Visualization ready."
     try:
-        json_match = re.search(r"\{[\s\S]*\}", dissected_raw)
-        parsed = json.loads(json_match.group(0)) if json_match else {}
+        clean_raw = re.sub(r"```[a-zA-Z]*", "", dissected_raw)
+        clean_raw = clean_raw.replace("```", "").strip()
+        json_blocks = re.findall(r"\{[\s\S]*\}", clean_raw)
+        parsed = json.loads(json_blocks[-1]) if json_blocks else {}
     except Exception as e:
         print("⚠️ JSON parse error:", e)
         parsed = {}
 
+    # --- Extract useful fields ---
     dimension = parsed.get("dimension", "2d").lower().strip()
-    description = (
-        parsed.get("description")
-        or parsed.get("description")
-        or "✅ Visualization ready."
-    )
+    description = parsed.get("description") or "✅ Visualization ready."
 
     # === Stage 2: Code Generation (GPT-5-mini) ===
     gen_file = "3D_General.txt" if dimension == "3d" else "2D_General.txt"
@@ -70,7 +74,7 @@ def chat():
         f"{json.dumps(parsed, indent=2)}"
     )
 
-    # Clean generator code
+    # --- Clean generator output ---
     cleaned_code = (
         generated_code.replace("\r", "")
         .replace("</script>", "")
@@ -91,7 +95,7 @@ def chat():
 
     styled_code = call_openai(STYLER_MODEL, f"{p3}\n\nBase Visualization Code:\n{cleaned_code}")
 
-    # Final clean (strip backticks or tags)
+    # --- Final clean (strip backticks or tags) ---
     styled_code = (
         styled_code.replace("\r", "")
         .replace("</script>", "")
@@ -100,16 +104,18 @@ def chat():
     styled_code = re.sub(r"```[a-zA-Z]*", "", styled_code)
     styled_code = styled_code.replace("```", "").strip()
 
-    print("\n=== 🎨 FINAL STYLED CODE ===\n", styled_code[:1000], "\n...\n=============================\n")
+    print("\n=== 🎨 FINAL STYLED CODE (first 1000 chars) ===\n")
+    print(styled_code[:1000])
+    print("\n...\n==============================================\n")
 
     return jsonify({
-        "analysis": dissected_raw,
+        "analysis_raw": dissected_raw,   # ✅ full dissector response
+        "analysis_parsed": parsed,       # ✅ parsed JSON for debug
         "dimension": dimension,
         "description": description,
         "code": styled_code,
         "status": "complete"
     })
-
 
 @app.route("/")
 def index():
