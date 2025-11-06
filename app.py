@@ -79,7 +79,7 @@ def chat():
         p2 = f.read()
 
     # 🧠 Stage 2: Code Generation (also using Groq temporarily)
-    final_code = call_groq(f"{p2}\n\nStructured Request:\n{dissected_raw}")
+    final_code = call_gpt5(f"{p2}\n\nStructured Request:\n{dissected_raw}")
 
     # Clean code
     cleaned_code = (
