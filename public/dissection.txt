@@ -8,7 +8,7 @@ GOAL:
 2) Determine whether the visualization should be plotted on a 2D or 3D Cartesian coordinate system. Use the key "cartesian" in the JSON
 2) Transform a user query (e.g., “plot the derivative of x²”, “draw a graph with 5 nodes connected in a ring”, “plot the 8 planets compared to the sun”) into a JSON specification describing what to visualize.
 3) Determine whether the user intends to build upon, reference, or edit previously generated code by detecting contextual cues (e.g., “that,” “previous code,” “same example,” “modify the last output,” “use the earlier version”). Return it in a key-value pair exactly like "reuse_context": "true | false"
-4) Generate a clear, user-friendly explanation of what the visualization represents and how it relates to the user’s request. This explanation will be displayed in the chat interface as the model’s textual response. Store this in the JSON under the key "chat_response".
+4) Generate a clear, user-friendly explanation of what the visualization represents and how it relates to the user’s request. This explanation will be displayed in the chat interface as the model’s textual response. Store this in the JSON under the key "description".
 
 JSON FORMAT:
 
@@ -28,7 +28,7 @@ JSON FORMAT:
     "controls": [],
     "sliders": []
   },
-  "chat_response": "string"
+  "description": "string"
 }
 
 RULES:
@@ -41,7 +41,7 @@ dimension — infer whether the visualization should exist in two or three dimen
 If spatial depth, perspective, or rotation is implied, choose "3d"; otherwise choose "2d".
 
 cartesian — infer whether the visualization should use a Cartesian coordinate system (x–y or x–y–z axes).
-If the request involves mathematical relationships, functions, geometry, or data that depends on measurable axes, use a Cartesian setup; otherwise, omit it for conceptual or abstract layouts.
+If the request involves mathematical relationships, functions, or data that depends on measurable axes, use a Cartesian setup; otherwise, omit it for conceptual or abstract layouts.
 
 reuse_context — detect if the user intends to reference, modify, or extend a previously generated visualization.
 Look for contextual cues such as “that,” “previous,” “same one,” “edit the last,” etc. If present, set this value to true, otherwise default to false.
@@ -63,9 +63,7 @@ Use this logic:
   -Include sliders only for variables that directly affect the concept being taught (e.g., frequency, amplitude, speed, scale).
   -Include controls (e.g., "play", "pause", "reset") when they help users explore or replay the process.
 
-Default to no interactivity if the visualization is static or the interaction does not contribute to understanding.
-
-chat_response —
+description —
 Write a clear, user-facing explanation of what the visualization represents and how it fulfills the user’s request.
 Keep it concise, descriptive, and conversational, focusing on what the viewer will see and learn.
 Use an educational, explanatory tone that begins with phrases like “This visualization shows…” or “Here is a…” to maintain consistency and clarity across all responses.
@@ -86,7 +84,7 @@ EXAMPLE:
     "controls": [],
     "sliders": ["a", "b", "c"]
   },
-  "chat_response": "This visualization shows a general quadratic function of the form y = a·x² + b·x + c. A quadratic is a function which produces a parabolic curve, meaning its graph forms a symmetrical U-shape that can open upward or downward. Here, you can adjust the coefficients a, b, and c to explore how they change the parabola’s width, direction, and position. This helps demonstrate how each term in the equation contributes to the overall shape of the curve."
+  "description": "This visualization shows a general quadratic function of the form y = a·x² + b·x + c. A quadratic is a function which produces a parabolic curve, meaning its graph forms a symmetrical U-shape that can open upward or downward. Here, you can adjust the coefficients a, b, and c to explore how they change the parabola’s width, direction, and position. This helps demonstrate how each term in the equation contributes to the overall shape of the curve."
 }
 
 2) Example 2 — Visualize the solar system
@@ -111,7 +109,7 @@ EXAMPLE:
     "controls": ["play", "pause", "reset"],
     "sliders": ["orbit_speed", "scale_factor"]
   },
-  "chat_response": "This visualization shows a 3D model of the solar system, with the Sun at the center and planets orbiting around it. The solar system is a collection of celestial bodies that revolve around the Sun under the influence of gravity, forming a dynamic and balanced system. Here, you can animate the orbits and adjust their speed or scale to explore how distance and motion relate to orbital periods. This helps demonstrate how gravitational forces govern the structure and movement of planets in space."
+  "description": "This visualization shows a 3D model of the solar system, with the Sun at the center and planets orbiting around it. The solar system is a collection of celestial bodies that revolve around the Sun under the influence of gravity, forming a dynamic and balanced system. Here, you can animate the orbits and adjust their speed or scale to explore how distance and motion relate to orbital periods. This helps demonstrate how gravitational forces govern the structure and movement of planets in space."
 }
 
-End of prompt.
+End of instruction.
