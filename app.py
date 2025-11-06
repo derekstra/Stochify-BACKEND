@@ -10,47 +10,37 @@ BASE_DIR = os.path.dirname(__file__)
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 
 # === Config ===
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = "llama-3.3-70b-versatile"
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
-OPENAI_MODEL = "gpt-5-mini"
 
+# Models
+DISSECTOR_MODEL = "gpt-4-mini"
+GENERATOR_MODEL = "gpt-5-mini"
+STYLER_MODEL = "gpt-4-mini"
 
-# --- API Call Helpers ---
-def call_groq(prompt):
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    data = {"model": GROQ_MODEL, "messages": [{"role": "user", "content": prompt}]}
-    r = requests.post(GROQ_URL, headers=headers, json=data)
-    res = r.json()
-    raw = res.get("choices", [{}])[0].get("message", {}).get("content", "")
-    print("\n=== 🧠 GROQ RAW RESPONSE ===\n", raw, "\n============================\n")
-    return raw
-
-
-def call_gpt5(prompt):
+# --- API Call Helper ---
+def call_openai(model, prompt):
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
-    data = {"model": OPENAI_MODEL, "messages": [{"role": "user", "content": prompt}]}
+    data = {"model": model, "messages": [{"role": "user", "content": prompt}]}
     r = requests.post(OPENAI_URL, headers=headers, json=data)
     res = r.json()
     raw = res.get("choices", [{}])[0].get("message", {}).get("content", "")
-    print("\n=== 🎨 GPT-5 RAW RESPONSE ===\n", raw, "\n============================\n")
+    print(f"\n=== 🧠 {model.upper()} RAW RESPONSE ===\n{raw}\n============================\n")
     return raw
+
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
     user_input = request.json.get("message", "")
     print(f"\n=== 💬 USER INPUT ===\n{user_input}\n=====================\n")
 
-    # Stage 1: Dissection (Groq)
+    # === Stage 1: Dissection (GPT-4-mini) ===
     with open(os.path.join(PUBLIC_DIR, "dissection.txt"), encoding="utf-8") as f:
         p1 = f.read()
-    dissected_raw = call_groq(f"{p1}\n\nUser request:\n{user_input}")
+    dissected_raw = call_openai(DISSECTOR_MODEL, f"{p1}\n\nUser request:\n{user_input}")
 
     # Parse JSON safely
-    dimension, cartesian, chat_response = "2d", False, "✅ Visualization ready."
+    dimension, description = "2d", "✅ Visualization ready."
     try:
         json_match = re.search(r"\{[\s\S]*\}", dissected_raw)
         parsed = json.loads(json_match.group(0)) if json_match else {}
@@ -58,19 +48,15 @@ def chat():
         print("⚠️ JSON parse error:", e)
         parsed = {}
 
-    # Extract keys
     dimension = parsed.get("dimension", "2d").lower().strip()
-    cartesian = str(parsed.get("cartesian", "false")).lower() == "true"
-    chat_response = parsed.get("chat_response", "✅ Visualization ready.")
-
-    # Pick correct generation template
-    gen_file = (
-        "3D_Cartesian.txt" if (cartesian and dimension == "3d")
-        else "2D_Cartesian.txt" if cartesian
-        else "3D_General.txt" if dimension == "3d"
-        else "2D_General.txt"
+    description = (
+        parsed.get("description")
+        or parsed.get("description")
+        or "✅ Visualization ready."
     )
 
+    # === Stage 2: Code Generation (GPT-5-mini) ===
+    gen_file = "3D_General.txt" if dimension == "3d" else "2D_General.txt"
     gen_path = os.path.join(PUBLIC_DIR, gen_file)
     if not os.path.exists(gen_path):
         return jsonify({"status": "error", "message": f"{gen_file} missing"}), 404
@@ -78,12 +64,15 @@ def chat():
     with open(gen_path, encoding="utf-8") as f:
         p2 = f.read()
 
-    # 🧠 Stage 2: Code Generation (also using Groq temporarily)
-    final_code = call_gpt5(f"{p2}\n\nStructured Request:\n{dissected_raw}")
+    generated_code = call_openai(
+        GENERATOR_MODEL,
+        f"{p2}\n\nThe following structured JSON describes the user's visualization request:\n"
+        f"{json.dumps(parsed, indent=2)}"
+    )
 
-    # Clean code
+    # Clean generator code
     cleaned_code = (
-        final_code.replace("\r", "")
+        generated_code.replace("\r", "")
         .replace("</script>", "")
         .replace("<script>", "")
     )
@@ -91,20 +80,40 @@ def chat():
     cleaned_code = cleaned_code.replace("```", "").strip()
     cleaned_code = re.sub(r'd3\.select\(["\']body["\']\)', 'd3.select("#viz")', cleaned_code)
 
-    print("\n=== ✅ FINAL CLEANED CODE ===\n", cleaned_code[:1000], "\n...\n=============================\n")
+    # === Stage 3: Styler/Enhancer (GPT-4-mini) ===
+    styler_file = "3D_Styler.txt" if dimension == "3d" else "2D_Styler.txt"
+    styler_path = os.path.join(PUBLIC_DIR, styler_file)
+    if not os.path.exists(styler_path):
+        return jsonify({"status": "error", "message": f"{styler_file} missing"}), 404
+
+    with open(styler_path, encoding="utf-8") as f:
+        p3 = f.read()
+
+    styled_code = call_openai(STYLER_MODEL, f"{p3}\n\nBase Visualization Code:\n{cleaned_code}")
+
+    # Final clean (strip backticks or tags)
+    styled_code = (
+        styled_code.replace("\r", "")
+        .replace("</script>", "")
+        .replace("<script>", "")
+    )
+    styled_code = re.sub(r"```[a-zA-Z]*", "", styled_code)
+    styled_code = styled_code.replace("```", "").strip()
+
+    print("\n=== 🎨 FINAL STYLED CODE ===\n", styled_code[:1000], "\n...\n=============================\n")
 
     return jsonify({
         "analysis": dissected_raw,
         "dimension": dimension,
-        "cartesian": cartesian,
-        "chat_response": chat_response,
-        "code": cleaned_code,
+        "description": description,
+        "code": styled_code,
         "status": "complete"
     })
 
+
 @app.route("/")
 def index():
-    return "✅ Welcome! Flask backend is running successfully."
+    return "✅ Welcome! Flask backend with Dissector → Generator → Styler is running successfully."
 
 
 if __name__ == "__main__":
