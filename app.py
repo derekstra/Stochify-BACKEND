@@ -14,9 +14,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 # Models
-DISSECTOR_MODEL = "gpt-4-mini"
+DISSECTOR_MODEL = "gpt-4o-mini"
 GENERATOR_MODEL = "gpt-5-mini"
-STYLER_MODEL = "gpt-4-mini"
+STYLER_MODEL = "gpt-4o-mini"
 
 # --- API Call Helper ---
 def call_openai(model, prompt):
