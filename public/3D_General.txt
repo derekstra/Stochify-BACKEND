@@ -18,11 +18,14 @@ Output:
 - The output must execute immediately when injected into a webpage that already contains a <div id="viz"></div> element.
 
 Environment:
-- Use Three.js v0.160.0 (ES module syntax).
-- Import modules from:
-  import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-  import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-- Render only inside the container with ID "viz". Never use document.body or other elements.
+
+Use Three.js v0.160.0 (ES module build).
+Load modules dynamically using await import() — do not use static import statements.
+Import modules as follows:
+  const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
+  const { OrbitControls } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js");
+Render only inside the container with ID "viz".
+Never reference or append to document.body or any other element outside #viz.
 
 Code Structure:
 Wrap all code between:

@@ -17,10 +17,10 @@ OUTPUT FORMAT
 Return only a complete <script type="module">...</script> block — no markdown, comments, or explanations.
 Must execute immediately inside #viz.
 
-Use Three.js v0.160.0 (ES modules):
+Use Three.js v0.160.0 (dynamic module imports):
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
+const { OrbitControls } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js");
 
 Wrap exactly between:
 
