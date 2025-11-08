@@ -1,23 +1,10 @@
-# === app.py (Unified Dev + Prod Backend with Live Stage Streaming) ===
+# === app.py (Stochify Backend with HTTP Polling Status Updates) ===
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_socketio import SocketIO
-import os, requests, json, re, time
+import os, requests, json, re, time, threading
 
-# === App Setup ===
 app = Flask(__name__)
-
-# Allow both local and production origins
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "https://stochify.com"
-        ]
-    }
-})
-socketio = SocketIO(app, cors_allowed_origins="*")
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # === Paths ===
 BASE_DIR = os.path.dirname(__file__)
@@ -32,17 +19,17 @@ DISSECTOR_MODEL = "gpt-3.5-turbo"
 GENERATOR_MODEL = "gpt-4o-mini"
 STYLER_MODEL = "gpt-3.5-turbo"
 
-
-# --- Helper: Emit live status updates to frontend ---
-def send_status(stage, data=None):
-    payload = {"stage": stage}
-    if data:
-        payload["data"] = data
-    socketio.emit("status_update", payload)
-    print(f"📡 STATUS: {stage}")
+# === Task store (in-memory) ===
+TASKS = {}  # { task_id: {"status": "Reading prompt...", "data": {...}} }
 
 
-# --- Helper: Call OpenAI with timing ---
+# --- Helper: Update and store current task status ---
+def update_status(task_id, stage, data=None):
+    TASKS[task_id] = {"status": stage, "data": data or {}}
+    print(f"📡 STATUS [{task_id}]: {stage}")
+
+
+# --- Helper: OpenAI call with timing ---
 def call_openai(model, prompt):
     start_time = time.perf_counter()
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
@@ -58,20 +45,16 @@ def call_openai(model, prompt):
         print(f"⚠️ Error reading response: {e}")
         raw = ""
 
-    print(f"\n=== 🧠 {model.upper()} RAW RESPONSE ===\n{raw[:400]}...\n============================")
-    print(f"⏱️  {model.upper()} execution time: {duration:.2f}s\n")
+    print(f"🧠 {model.upper()} completed in {duration:.2f}s")
     return raw, duration
 
 
-# === Main API Endpoint ===
-@app.route("/api/chat", methods=["POST"])
-def chat():
+# --- Worker thread: run full pipeline asynchronously ---
+def run_pipeline(task_id, user_input):
     total_start = time.perf_counter()
-    user_input = request.json.get("message", "")
-    print(f"\n=== 💬 USER INPUT ===\n{user_input}\n=====================\n")
 
     # === 1️⃣ Dissector Stage ===
-    send_status("Reading prompt...")
+    update_status(task_id, "Reading prompt...")
     with open(os.path.join(PUBLIC_DIR, "dissection.txt"), encoding="utf-8") as f:
         p1 = f.read()
 
@@ -92,12 +75,9 @@ def chat():
     chat_response = parsed.get("description", "✅ Visualization ready.")
 
     # === 2️⃣ Generator Stage ===
-    send_status("Generating code...")
+    update_status(task_id, "Generating code...")
     gen_file = "3D_General.txt" if dimension == "3d" else "2D_General.txt"
     gen_path = os.path.join(PUBLIC_DIR, gen_file)
-    if not os.path.exists(gen_path):
-        return jsonify({"status": "error", "message": f"{gen_file} missing"}), 404
-
     with open(gen_path, encoding="utf-8") as f:
         p2 = f.read()
 
@@ -117,12 +97,9 @@ def chat():
     cleaned_code = re.sub(r'd3\.select\(["\']body["\']\)', 'd3.select("#viz")', cleaned_code)
 
     # === 3️⃣ Styler Stage ===
-    send_status("Refining generation...")
+    update_status(task_id, "Refining generation...")
     styler_file = "3D_Styler.txt" if dimension == "3d" else "2D_Styler.txt"
     styler_path = os.path.join(PUBLIC_DIR, styler_file)
-    if not os.path.exists(styler_path):
-        return jsonify({"status": "error", "message": f"{styler_file} missing"}), 404
-
     with open(styler_path, encoding="utf-8") as f:
         p3 = f.read()
 
@@ -139,41 +116,41 @@ def chat():
     styled_code = styled_code.replace("```", "").strip()
 
     total_time = time.perf_counter() - total_start
+    update_status(task_id, "complete", {"chat_response": chat_response})
 
-    # === ✅ Final stage ===
-    send_status("complete", {"chat_response": chat_response})
+    TASKS[task_id]["timing"] = {
+        "dissector_s": round(dissector_time, 2),
+        "generator_s": round(generator_time, 2),
+        "styler_s": round(styler_time, 2),
+        "total_s": round(total_time, 2),
+    }
 
-    print("\n=== 🎨 FINAL STYLED CODE (first 1000 chars) ===")
-    print(styled_code[:1000])
-    print("\n==============================================")
-    print(f"🕓 Timing Summary:")
-    print(f"  • Dissector: {dissector_time:.2f}s")
-    print(f"  • Generator: {generator_time:.2f}s")
-    print(f"  • Styler:    {styler_time:.2f}s")
-    print(f"  • TOTAL:     {total_time:.2f}s")
-    print("==============================================\n")
+    print(f"✅ Task {task_id} complete in {total_time:.2f}s")
 
-    return jsonify({
-        "analysis_raw": dissected_raw,
-        "analysis_parsed": parsed,
-        "dimension": dimension,
-        "description": chat_response,
-        "code": styled_code,
-        "status": "complete",
-        "timing": {
-            "dissector_s": round(dissector_time, 2),
-            "generator_s": round(generator_time, 2),
-            "styler_s": round(styler_time, 2),
-            "total_s": round(total_time, 2)
-        }
-    })
+
+# === API ROUTES ===
+
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    user_input = request.json.get("message", "")
+    task_id = str(int(time.time() * 1000))
+    TASKS[task_id] = {"status": "starting"}
+    threading.Thread(target=run_pipeline, args=(task_id, user_input)).start()
+    return jsonify({"task_id": task_id})
+
+
+@app.route("/api/status/<task_id>", methods=["GET"])
+def status(task_id):
+    task = TASKS.get(task_id)
+    if not task:
+        return jsonify({"status": "unknown"})
+    return jsonify(task)
 
 
 @app.route("/")
 def index():
-    return "✅ Stochify unified backend (Flask + SocketIO) is running."
+    return "✅ Stochify backend running with polling-based stage updates."
 
 
 if __name__ == "__main__":
-    # Debug auto-reload for dev, normal run for prod
-    socketio.run(app, debug=True, port=5000)
+    app.run(debug=True, port=5000)
