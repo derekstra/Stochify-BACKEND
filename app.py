@@ -54,7 +54,7 @@ def run_pipeline(task_id, user_input):
     total_start = time.perf_counter()
 
     # === 1️⃣ Dissector Stage ===
-    update_status(task_id, "Reading prompt...")
+    update_status(task_id, "Dissecting request and understanding intent")
     with open(os.path.join(PUBLIC_DIR, "dissection.txt"), encoding="utf-8") as f:
         p1 = f.read()
 
@@ -75,7 +75,7 @@ def run_pipeline(task_id, user_input):
     chat_response = parsed.get("description", "✅ Visualization ready.")
 
     # === 2️⃣ Generator Stage ===
-    update_status(task_id, "Generating code...")
+    update_status(task_id, "Preparing logic and generating output")
     gen_file = "3D_General.txt" if dimension == "3d" else "2D_General.txt"
     gen_path = os.path.join(PUBLIC_DIR, gen_file)
     with open(gen_path, encoding="utf-8") as f:
@@ -97,7 +97,7 @@ def run_pipeline(task_id, user_input):
     cleaned_code = re.sub(r'd3\.select\(["\']body["\']\)', 'd3.select("#viz")', cleaned_code)
 
     # === 3️⃣ Styler Stage ===
-    update_status(task_id, "Refining generation...")
+    update_status(task_id, "Refining styles and ensuring correct execution")
     styler_file = "3D_Styler.txt" if dimension == "3d" else "2D_Styler.txt"
     styler_path = os.path.join(PUBLIC_DIR, styler_file)
     with open(styler_path, encoding="utf-8") as f:
