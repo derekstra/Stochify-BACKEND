@@ -116,7 +116,11 @@ def run_pipeline(task_id, user_input):
     styled_code = styled_code.replace("```", "").strip()
 
     total_time = time.perf_counter() - total_start
-    update_status(task_id, "complete", {"chat_response": chat_response})
+    update_status(task_id, "complete", {
+        "chat_response": chat_response,
+        "dimension": dimension,
+        "code": styled_code
+    })
 
     TASKS[task_id]["timing"] = {
         "dissector_s": round(dissector_time, 2),
