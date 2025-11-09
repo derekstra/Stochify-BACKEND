@@ -16,8 +16,8 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 # === Models ===
 DISSECTOR_MODEL = "gpt-3.5-turbo"
-GENERATOR_MODEL = "gpt-4o-mini"
-STYLER_MODEL = "gpt-3.5-turbo"
+GENERATOR_MODEL = "gpt-5-mini"
+STYLER_MODEL = "gpt-5-mini"
 
 # === Task store (in-memory) ===
 TASKS = {}  # { task_id: {"status": "Reading prompt...", "data": {...}} }
@@ -54,7 +54,7 @@ def run_pipeline(task_id, user_input):
     total_start = time.perf_counter()
 
     # === 1️⃣ Dissector Stage ===
-    update_status(task_id, "Dissecting request and understanding intent")
+    update_status(task_id, "Dissecting request and understanding request...")
     with open(os.path.join(PUBLIC_DIR, "dissection.txt"), encoding="utf-8") as f:
         p1 = f.read()
 
@@ -68,23 +68,32 @@ def run_pipeline(task_id, user_input):
         json_blocks = re.findall(r"\{[\s\S]*\}", clean_raw)
         parsed = json.loads(json_blocks[-1]) if json_blocks else {}
     except Exception as e:
-        print("⚠️ JSON parse error:", e)
+        print("JSON parse error:", e)
         parsed = {}
 
     dimension = parsed.get("dimension", "2d").lower().strip()
-    chat_response = parsed.get("description", "✅ Visualization ready.")
+    chat_response = parsed.get("description", "Visualization ready.")
+
+    # Extract only the intent for the generator
+    intent_text = (parsed.get("intent") or "").strip()
+
+    # Optional hardening: fallback if intent is missing
+    if not intent_text:
+        # Try a minimal fallback: use description, else raw cleaned text
+        intent_text = (parsed.get("description") or clean_raw[:1000]).strip()
 
     # === 2️⃣ Generator Stage ===
-    update_status(task_id, "Preparing logic and generating output")
+    update_status(task_id, "Generating visualization logic...")
     gen_file = "3D_General.txt" if dimension == "3d" else "2D_General.txt"
     gen_path = os.path.join(PUBLIC_DIR, gen_file)
     with open(gen_path, encoding="utf-8") as f:
         p2 = f.read()
 
+    generator_input = f"{p2}\n\nUser request: {intent_text}"
+
     generated_code, generator_time = call_openai(
         GENERATOR_MODEL,
-        f"{p2}\n\nThe following structured JSON describes the user's visualization request:\n"
-        f"{json.dumps(parsed, indent=2)}"
+        generator_input
     )
 
     cleaned_code = (
@@ -97,14 +106,15 @@ def run_pipeline(task_id, user_input):
     cleaned_code = re.sub(r'd3\.select\(["\']body["\']\)', 'd3.select("#viz")', cleaned_code)
 
     # === 3️⃣ Styler Stage ===
-    update_status(task_id, "Refining styles and ensuring correct execution")
+    update_status(task_id, "Refining styles and ensuring correct execution...")
     styler_file = "3D_Styler.txt" if dimension == "3d" else "2D_Styler.txt"
     styler_path = os.path.join(PUBLIC_DIR, styler_file)
     with open(styler_path, encoding="utf-8") as f:
         p3 = f.read()
 
     styled_code, styler_time = call_openai(
-        STYLER_MODEL, f"{p3}\n\nBase Visualization Code:\n{cleaned_code}"
+        STYLER_MODEL,
+        f"{p3}\n\nUser request: {intent_text}\n\nCode:\n{cleaned_code}"
     )
 
     styled_code = (
@@ -153,7 +163,7 @@ def status(task_id):
 
 @app.route("/")
 def index():
-    return "✅ Stochify backend running with polling-based stage updates."
+    return "✅ Stochify backend is running."
 
 
 if __name__ == "__main__":
