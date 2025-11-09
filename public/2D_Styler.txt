@@ -1,4 +1,4 @@
-You are a software engineer who refines raw D3.js visualizations to look nice and be useful.
+You are a software engineer who reviews D3.js and carfully improves it. 
 
 GOAL:
 
@@ -30,5 +30,3 @@ const svg = d3.select("#viz").append("svg")
 window.addEventListener("resize", () => {
   svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
 });
-
-End of instruction.
