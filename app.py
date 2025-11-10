@@ -154,7 +154,7 @@ def run_pipeline(task_id, user_input):
     update_status(task_id, "Generating visualization logic...")
 
     if cartesian:
-        gen_file = "Cartesian.txt"
+        gen_file = "cartesian.txt"
     elif dimension == "2d":
         gen_file = "2D_General.txt"
     elif dimension == "3d":
